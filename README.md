@@ -11,6 +11,8 @@
 1. tcp_sock.c
 2. tcp_in.c
 3. tcp_timer.c
+4. tcp_out.c
+5. tcp_sock.c 
 
 ## 步骤
 1. 首先分析main.c 文件里面的函数调用流程
