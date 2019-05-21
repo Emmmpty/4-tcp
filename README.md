@@ -11,8 +11,6 @@
 1. tcp_sock.c
 2. tcp_in.c
 3. tcp_timer.c
-4. tcp_out.c
-5. tcp_sock.c 
 
 
 ## 实验过程
@@ -108,3 +106,7 @@ void tcp_sock_close(struct tcp_sock *tsk)
 }
 
 ```
+
+2、tcp_in
+
+3、tcp_timer
