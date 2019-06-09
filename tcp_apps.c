@@ -14,7 +14,7 @@ void *tcp_server(void *arg)
 	struct tcp_sock *tsk = alloc_tcp_sock();
 
 	struct sock_addr addr;
-	addr.ip = htonl(0);
+	addr.ip =htonl(0);
 	addr.port = port;
 	if (tcp_sock_bind(tsk, &addr) < 0) {
 		log(ERROR, "tcp_sock bind to port %hu failed", ntohs(port));
@@ -56,6 +56,7 @@ void *tcp_server(void *arg)
 // send file to it.
 void *tcp_client(void *arg)
 {
+	sleep(3);
 	struct sock_addr *skaddr = arg;
 
 	struct tcp_sock *tsk = alloc_tcp_sock();
@@ -66,13 +67,14 @@ void *tcp_client(void *arg)
 		exit(1);
 	}
 	char buf[BUF_SIZE];
+	sleep(5);
 	FILE *file = fopen("client-input.dat", "rb");
 	while (!feof(file)) {
         int ret_size = fread(buf, 1, BUF_SIZE, file);
         tcp_sock_write(tsk, buf, ret_size);
 
         if (ret_size < BUF_SIZE) break;
-	usleep(500);
+	usleep(1000*300);
     }
 
     fclose(file);
