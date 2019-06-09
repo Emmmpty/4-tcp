@@ -123,4 +123,5 @@ int tcp_send_data(struct tcp_sock *tsk, char *buf, int len) {
 	char* tcp_data = packet + ETHER_HDR_SIZE + IP_BASE_HDR_SIZE + TCP_BASE_HDR_SIZE;
 	memcpy(tcp_data, buf, tsk->snd_wnd);
 	tcp_send_packet(tsk, packet, pkt_len);
+	return 0;
 }
