@@ -365,6 +365,8 @@ struct tcp_sock *tcp_sock_accept(struct tcp_sock *tsk)
 	return csk;
 }
 
+// clear the listen queue, which is carried out when *close* the tcp sock
+
 // similar to read function, try to read from socket tsk
 int tcp_sock_read(struct tcp_sock *tsk, char *buf, int size)
 {
