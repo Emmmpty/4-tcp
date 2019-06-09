@@ -72,7 +72,7 @@ void *tcp_client(void *arg)
         tcp_sock_write(tsk, buf, ret_size);
 
         if (ret_size < BUF_SIZE) break;
-		//usleep(500000);
+	usleep(500);
     }
 
     fclose(file);
