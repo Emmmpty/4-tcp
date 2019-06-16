@@ -128,3 +128,6 @@ void *tcp_client(void *arg)
 2、tcp_in
 
 3、tcp_timer
+
+## Process
+1. alloc_tcp_sock, the initiate recv_window size if 65535
