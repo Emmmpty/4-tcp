@@ -68,7 +68,7 @@ struct tcp_sock *alloc_tcp_sock()
 
 // release all the resources of tcp sock
 //
-// To make the stack run safely, each time the tcp sock is refered (e.g. hashed), 
+// To make the stack run safely, each time the tcp sock is refered (e.g. hashed),
 // the ref_cnt is increased by 1. each time free_tcp_sock is called, the ref_cnt
 // is decreased by 1, and release the resources practically if ref_cnt is
 // decreased to zero.
@@ -228,7 +228,7 @@ int tcp_hash(struct tcp_sock *tsk)
 	}
 	else {
 		int hash = tcp_hash_function(tsk->sk_sip, tsk->sk_dip, \
-				tsk->sk_sport, tsk->sk_dport); 
+				tsk->sk_sport, tsk->sk_dport);
 		list = &tcp_established_sock_table[hash];
 
 		struct tcp_sock *tmp;
@@ -373,6 +373,11 @@ int tcp_sock_read(struct tcp_sock *tsk, char *buf, int size)
 	//fprintf(stdout, "TODO: implement %s please.\n", __FUNCTION__);
 
 	int read_size = 0;
+	if(tsk->state == TCP_CLOSE_WAIT)
+	//when tcp in TCP_CLOSE_WAIT,it cannot read anymore "
+	{
+        return read_size;
+	}
 	if (ring_buffer_empty(tsk->rcv_buf))
 	{
 		sleep_on(tsk->wait_recv);
@@ -414,9 +419,20 @@ void tcp_sock_close(struct tcp_sock *tsk)
 	case TCP_SYN_SENT:
 		break;
 	case TCP_ESTABLISHED:
-		tcp_send_control_packet(tsk, TCP_FIN | TCP_ACK);
+		tcp_send_control_packet(tsk, TCP_FIN);
+		printf("[TCP_ESTABLISHED]:tcp send FIN,only send FIN\n");
 		tcp_set_state(tsk, TCP_FIN_WAIT_1);
 		break;
+    case TCP_FIN_WAIT_1:
+        //receive from remote's ACK after myself FIN.
+        printf("[TCP_FIN_WAIT_1]:tcp recv ACK\n");
+        tcp_set_state(tsk,TCP_FIN_WAIT_2);
+        break;
+    case TCP_FIN_WAIT_2:
+        tcp_send_control_packet(tsk,TCP_ACK);
+        printf("[TCP_FIN_WAIT_2]:tcp recv FIN,send ACK.\n");
+        tcp_set_state(tsk,TCP_TIME_WAIT);
+        break;
 	case TCP_CLOSE_WAIT:
 		tcp_send_control_packet(tsk, TCP_FIN);
 		tcp_set_state(tsk, TCP_LAST_ACK);

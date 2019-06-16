@@ -33,22 +33,26 @@ void *tcp_server(void *arg)
 
 	char rbuf[BUF_SIZE];
 	FILE *file = fopen("server-output.dat", "wb");
+	int total_cnt = 0;
 	while (1) {
 		int rlen = tcp_sock_read(csk, rbuf, BUF_SIZE);
 		if (rlen == 0) {
 			log(DEBUG, "tcp_sock_read return 0, finish transmission.");
 			break;
-		} 
+		}
 		else if (rlen > 0) {
 			fwrite(rbuf, 1, rlen, file);
+			printf("receive %d bytes.\n",rlen);
+			total_cnt += rlen;
 		}
 	}
 
 	fclose(file);
+	printf("recieve %d bytes\n",total_cnt);
 	log(DEBUG, "close this connection.");
 	printf("server: close tsk.\n");
 	tcp_sock_close(csk);
-	
+
 	return NULL;
 }
 
@@ -69,15 +73,18 @@ void *tcp_client(void *arg)
 	char buf[BUF_SIZE];
 	sleep(5);
 	FILE *file = fopen("client-input.dat", "rb");
+	int total_cnt = 0;
 	while (!feof(file)) {
         int ret_size = fread(buf, 1, BUF_SIZE, file);
         tcp_sock_write(tsk, buf, ret_size);
-
+        printf("send %d bytes.\n",ret_size);
+        total_cnt +=ret_size;
         if (ret_size < BUF_SIZE) break;
 	usleep(1000*300);
     }
 
     fclose(file);
+    printf("total send %d bytes\n",total_cnt);
     printf("client: close tsk.\n");
 	tcp_sock_close(tsk);
 

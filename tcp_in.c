@@ -9,9 +9,9 @@
 
 // handling incoming packet for TCP_LISTEN state
 //
-// 1. malloc a child tcp sock to serve this connection request; 
+// 1. malloc a child tcp sock to serve this connection request;
 // 2. send TCP_SYN | TCP_ACK by child tcp sock;
-// 3. hash the child tcp sock into established_table (because the 4-tuple 
+// 3. hash the child tcp sock into established_table (because the 4-tuple
 //    is determined).
 
 void tcp_state_listen(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
@@ -50,8 +50,8 @@ void tcp_state_closed(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 
 // handling incoming packet for TCP_SYN_SENT state
 //
-// If everything goes well (the incoming packet is TCP_SYN|TCP_ACK), reply with 
-// TCP_ACK, and enter TCP_ESTABLISHED state, notify tcp_sock_connect; otherwise, 
+// If everything goes well (the incoming packet is TCP_SYN|TCP_ACK), reply with
+// TCP_ACK, and enter TCP_ESTABLISHED state, notify tcp_sock_connect; otherwise,
 // reply with TCP_RST.
 void tcp_state_syn_sent(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 {
@@ -138,15 +138,15 @@ int tcp_recv_data(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 // 	    release the resources of this tcp sock;
 // 	 6. if the TCP_SYN bit is set, reply with TCP_RST and close this connection,
 // 	    as valid TCP_SYN has been processed in step 2 & 3;
-// 	 7. check if the TCP_ACK bit is set, since every packet (except the first 
+// 	 7. check if the TCP_ACK bit is set, since every packet (except the first
 //      SYN) should set this bit;
-//   8. process the ack of the packet: if it ACKs the outgoing SYN packet, 
+//   8. process the ack of the packet: if it ACKs the outgoing SYN packet,
 //      establish the connection; if it ACKs new data, update the window;
 //      if it ACKs the outgoing FIN packet, switch to corresponding state;
 //   9. process the payload of the packet: call tcp_recv_data to receive data;
 //  10. if the TCP_FIN bit is set, update the TCP_STATE accordingly;
 //  11. at last, do not forget to reply with TCP_ACK if the connection is alive.
-// Process the incoming packet according to TCP state machine. 
+// Process the incoming packet according to TCP state machine.
 void tcp_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 {
 	//fprintf(stdout, "TODO: implement %s please.\n", __FUNCTION__);
@@ -187,19 +187,12 @@ void tcp_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 		return;
 	}
 
-	if (cb->flags & TCP_SYN)
+	if (cb->flags & TCP_RST)
 	{
 		//reply with TCP_RST and close this connection
 		tcp_send_reset(cb);
 		tcp_set_state(tsk, TCP_CLOSED);
 		tcp_unhash(tsk);
-		return;
-	}
-
-	if (!(cb->flags & TCP_ACK))
-	{
-		//drop
-		log(ERROR, "received tcp packet without ack, drop it.");
 		return;
 	}
 	//process the ack of the packet
@@ -208,25 +201,22 @@ void tcp_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 		tcp_state_syn_recv(tsk, cb, packet);
 		return;
 	}
-	if (tsk->state == TCP_FIN_WAIT_1)
+	if (tsk->state == TCP_FIN_WAIT_1 && (cb->flags & TCP_ACK))
 	{
 		tcp_set_state(tsk, TCP_FIN_WAIT_2);
+		//need to send FIN.
+		tcp_send_control_packet(tsk,TCP_FIN);
+		printf("[TCP_FIN_WAIT_2]:send TCP_FIN\n");
 		return;
 	}
-	if (tsk->state == TCP_LAST_ACK)
+	if (tsk->state == TCP_LAST_ACK && (cb->flags & TCP_ACK))
 	{
 		tcp_set_state(tsk, TCP_CLOSED);
 		tcp_unhash(tsk);
 		return;
 	}
-	if (tsk->state == TCP_FIN_WAIT_2)
+	if (tsk->state == TCP_FIN_WAIT_2 && (cb->flags & TCP_FIN))
 	{
-		if (cb->flags != (TCP_FIN | TCP_ACK))
-		{
-			//drop
-			log(ERROR, "received tcp packet without FIN|ACK, drop it.");
-			return;
-		}
 		tsk->rcv_nxt = cb->seq_end;
 		tcp_send_control_packet(tsk, TCP_ACK);
 		// start a timer
@@ -242,21 +232,36 @@ void tcp_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 	if (cb->pl_len > 0)
 		tcp_recv_data(tsk, cb, packet);
 
-	if (cb->flags & TCP_FIN)
+	if ((cb->flags & TCP_FIN) && tsk->state==TCP_ESTABLISHED)
 	{
 		//update the TCP_STATE accordingly
-		tcp_set_state(tsk, TCP_CLOSE_WAIT);
+
 		tsk->rcv_nxt = cb->seq_end;
 		tcp_send_control_packet(tsk, TCP_ACK);
-		tcp_send_control_packet(tsk, TCP_FIN | TCP_ACK);
-		tcp_set_state(tsk, TCP_LAST_ACK);
+		tcp_set_state(tsk, TCP_CLOSE_WAIT);
+        printf("[TCP_ESTABLISH]: send ACK,change to TCP_CLOSE_WAIT\n");
+
+        //wake up ,to driver process to call tcp_close()
+        wake_up(tsk->wait_recv);
+
+		//tcp_send_control_packet(tsk, TCP_FIN | TCP_ACK);---->only send when call tcp_sock_close.
+		//tcp_set_state(tsk, TCP_LAST_ACK);
 		return;
 	}
 
 	//reply with TCP_ACK if the connection is alive
+	/*
 	if (cb->flags != TCP_ACK)
 	{
 		tsk->rcv_nxt = cb->seq_end;
 		tcp_send_control_packet(tsk, TCP_ACK);
 	}
+
+	if (!(cb->flags & TCP_ACK))
+	{
+		//drop
+		log(ERROR, "received tcp packet without ack, drop it.");
+		return;
+	}
+	*/
 }
