@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="tcp_Homework" />
+		<Option makefile_is_custom="1" />
+		<Option execution_dir="../4-tcp" />
+		<Option pch_mode="2" />
+		<Option compiler="gcc" />
+		<Build>
+			<Target title="Debug">
+				<Option output="bin/Debug/tcp_Homework" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj/Debug/" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Compiler>
+					<Add option="-g" />
+				</Compiler>
+				<MakeCommands>
+					<Build command="$make -f $makefile " />
+					<CompileFile command="$make -f $makefile " />
+					<Clean command="$make -f $makefile clean" />
+					<DistClean command="$make -f $makefile distclean$target" />
+					<AskRebuildNeeded command="$make -q -f $makefile " />
+					<SilentBuild command="$make -f $makefile  &gt; $(CMD_NULL)" />
+				</MakeCommands>
+			</Target>
+			<Target title="Release">
+				<Option output="bin/Release/tcp_Homework" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj/Release/" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Compiler>
+					<Add option="-O2" />
+				</Compiler>
+				<Linker>
+					<Add option="-s" />
+				</Linker>
+			</Target>
+		</Build>
+		<Compiler>
+			<Add option="-Wall" />
+		</Compiler>
+		<Unit filename="../4-tcp/4-tcp.layout" />
+		<Unit filename="../4-tcp/4-tcp.sln" />
+		<Unit filename="../4-tcp/4-tcp.vcxproj" />
+		<Unit filename="../4-tcp/4-tcp.vcxproj.filters" />
+		<Unit filename="../4-tcp/4-tcp.vcxproj.user" />
+		<Unit filename="../4-tcp/Makefile" />
+		<Unit filename="../4-tcp/README.md" />
+		<Unit filename="../4-tcp/TODO.md" />
+		<Unit filename="../4-tcp/client-input.dat" />
+		<Unit filename="../4-tcp/client-input.dat.bkp" />
+		<Unit filename="../4-tcp/create_randfile.sh" />
+		<Unit filename="../4-tcp/doc/4-tcp.pptx" />
+		<Unit filename="../4-tcp/doc/实验说明.docx" />
+		<Unit filename="../4-tcp/doc/计网.xmind" />
+		<Unit filename="../4-tcp/doc/计网报告.pdf" />
+		<Unit filename="../4-tcp/include/arp.h" />
+		<Unit filename="../4-tcp/include/arpcache.h" />
+		<Unit filename="../4-tcp/include/async_wait.h" />
+		<Unit filename="../4-tcp/include/base.h" />
+		<Unit filename="../4-tcp/include/checksum.h" />
+		<Unit filename="../4-tcp/include/ether.h" />
+		<Unit filename="../4-tcp/include/hash.h" />
+		<Unit filename="../4-tcp/include/icmp.h" />
+		<Unit filename="../4-tcp/include/ip.h" />
+		<Unit filename="../4-tcp/include/list.h" />
+		<Unit filename="../4-tcp/include/log.h" />
+		<Unit filename="../4-tcp/include/packet.h" />
+		<Unit filename="../4-tcp/include/ring_buffer.h" />
+		<Unit filename="../4-tcp/include/rtable.h" />
+		<Unit filename="../4-tcp/include/synch_wait.h" />
+		<Unit filename="../4-tcp/include/tcp.h" />
+		<Unit filename="../4-tcp/include/tcp_apps.h" />
+		<Unit filename="../4-tcp/include/tcp_hash.h" />
+		<Unit filename="../4-tcp/include/tcp_sock.h" />
+		<Unit filename="../4-tcp/include/tcp_timer.h" />
+		<Unit filename="../4-tcp/include/types.h" />
+		<Unit filename="../4-tcp/ip.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="../4-tcp/ip.o" />
+		<Unit filename="../4-tcp/libipstack.a" />
+		<Unit filename="../4-tcp/libipstack32.a" />
+		<Unit filename="../4-tcp/main.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="../4-tcp/main.o" />
+		<Unit filename="../4-tcp/scripts/disable_arp.sh" />
+		<Unit filename="../4-tcp/scripts/disable_icmp.sh" />
+		<Unit filename="../4-tcp/scripts/disable_ip_forward.sh" />
+		<Unit filename="../4-tcp/scripts/disable_ipv6.sh" />
+		<Unit filename="../4-tcp/scripts/disable_offloading.sh" />
+		<Unit filename="../4-tcp/scripts/disable_tcp_rst.sh" />
+		<Unit filename="../4-tcp/server-output.dat" />
+		<Unit filename="../4-tcp/tcp.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="../4-tcp/tcp.o" />
+		<Unit filename="../4-tcp/tcp_apps.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="../4-tcp/tcp_apps.o" />
+		<Unit filename="../4-tcp/tcp_in.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="../4-tcp/tcp_in.o" />
+		<Unit filename="../4-tcp/tcp_out.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="../4-tcp/tcp_out.o" />
+		<Unit filename="../4-tcp/tcp_sock.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="../4-tcp/tcp_sock.o" />
+		<Unit filename="../4-tcp/tcp_stack" />
+		<Unit filename="../4-tcp/tcp_stack.py" />
+		<Unit filename="../4-tcp/tcp_timer.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="../4-tcp/tcp_timer.o" />
+		<Unit filename="../4-tcp/tcp_topo.py" />
+		<Unit filename="../4-tcp/tcp_topo_loss.py" />
+		<Unit filename="../4-tcp/tcp连接通信.xmind" />
+		<Extensions>
+			<code_completion />
+			<debugger />
+		</Extensions>
+	</Project>
+</CodeBlocks_project_file>

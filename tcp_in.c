@@ -203,20 +203,24 @@ void tcp_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 	}
 	if (tsk->state == TCP_FIN_WAIT_1 && (cb->flags & TCP_ACK))
 	{
+        //active close:current in TCP_FIN_WAIT_1,
+        //when recv TCP_ACK,THEN go to  TCP_FIN_WAIT_2
 		tcp_set_state(tsk, TCP_FIN_WAIT_2);
-		//need to send FIN.
-		tcp_send_control_packet(tsk,TCP_FIN);
-		printf("[TCP_FIN_WAIT_2]:send TCP_FIN\n");
 		return;
 	}
 	if (tsk->state == TCP_LAST_ACK && (cb->flags & TCP_ACK))
 	{
+        //passive close:current in LAST_ACK
+        //when recv ACK,Then go to TCP_CLOSED
 		tcp_set_state(tsk, TCP_CLOSED);
 		tcp_unhash(tsk);
 		return;
 	}
 	if (tsk->state == TCP_FIN_WAIT_2 && (cb->flags & TCP_FIN))
 	{
+        //active close : current in TCP_FIN_WAIT_2
+        //when recv TCP_FIN ,Then go to TIME_WAIT
+
 		tsk->rcv_nxt = cb->seq_end;
 		tcp_send_control_packet(tsk, TCP_ACK);
 		// start a timer
@@ -224,18 +228,11 @@ void tcp_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 		tcp_set_state(tsk, TCP_TIME_WAIT);
 		return;
 	}
-	//update rcv_wnd
-	tsk->rcv_wnd -= cb->pl_len;
-	//update snd_wnd
-	tcp_update_window_safe(tsk, cb);
-	//recive data
-	if (cb->pl_len > 0)
-		tcp_recv_data(tsk, cb, packet);
 
 	if ((cb->flags & TCP_FIN) && tsk->state==TCP_ESTABLISHED)
 	{
 		//update the TCP_STATE accordingly
-
+        //passive close.
 		tsk->rcv_nxt = cb->seq_end;
 		tcp_send_control_packet(tsk, TCP_ACK);
 		tcp_set_state(tsk, TCP_CLOSE_WAIT);
@@ -243,11 +240,16 @@ void tcp_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 
         //wake up ,to driver process to call tcp_close()
         wake_up(tsk->wait_recv);
-
-		//tcp_send_control_packet(tsk, TCP_FIN | TCP_ACK);---->only send when call tcp_sock_close.
-		//tcp_set_state(tsk, TCP_LAST_ACK);
 		return;
 	}
+
+	//update rcv_wnd
+	tsk->rcv_wnd -= cb->pl_len;
+	//update snd_wnd
+	tcp_update_window_safe(tsk, cb);
+	//recive data
+	if (cb->pl_len > 0)
+		tcp_recv_data(tsk, cb, packet);
 
 	//reply with TCP_ACK if the connection is alive
 	/*

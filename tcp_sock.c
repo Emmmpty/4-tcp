@@ -373,11 +373,6 @@ int tcp_sock_read(struct tcp_sock *tsk, char *buf, int size)
 	//fprintf(stdout, "TODO: implement %s please.\n", __FUNCTION__);
 
 	int read_size = 0;
-	if(tsk->state == TCP_CLOSE_WAIT)
-	//when tcp in TCP_CLOSE_WAIT,it cannot read anymore "
-	{
-        return read_size;
-	}
 	if (ring_buffer_empty(tsk->rcv_buf))
 	{
 		sleep_on(tsk->wait_recv);
@@ -420,19 +415,9 @@ void tcp_sock_close(struct tcp_sock *tsk)
 		break;
 	case TCP_ESTABLISHED:
 		tcp_send_control_packet(tsk, TCP_FIN);
-		printf("[TCP_ESTABLISHED]:tcp send FIN,only send FIN\n");
+		printf("[TCP_ESTABLISHED]:active close,tcp send FIN,only send FIN\n");
 		tcp_set_state(tsk, TCP_FIN_WAIT_1);
 		break;
-    case TCP_FIN_WAIT_1:
-        //receive from remote's ACK after myself FIN.
-        printf("[TCP_FIN_WAIT_1]:tcp recv ACK\n");
-        tcp_set_state(tsk,TCP_FIN_WAIT_2);
-        break;
-    case TCP_FIN_WAIT_2:
-        tcp_send_control_packet(tsk,TCP_ACK);
-        printf("[TCP_FIN_WAIT_2]:tcp recv FIN,send ACK.\n");
-        tcp_set_state(tsk,TCP_TIME_WAIT);
-        break;
 	case TCP_CLOSE_WAIT:
 		tcp_send_control_packet(tsk, TCP_FIN);
 		tcp_set_state(tsk, TCP_LAST_ACK);
