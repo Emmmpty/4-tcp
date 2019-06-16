@@ -113,3 +113,15 @@ void tcp_send_reset(struct tcp_cb *cb)
 
 	ip_send_packet(packet, pkt_size);
 }
+
+int tcp_send_data(struct tcp_sock *tsk, char *buf, int len) {
+	tsk->snd_wnd = len;
+	int pkt_len = ETHER_HDR_SIZE + IP_BASE_HDR_SIZE + TCP_BASE_HDR_SIZE + tsk->snd_wnd;
+	char *packet = (char*)malloc(pkt_len);
+	if (packet == NULL)
+		return -1;
+	char* tcp_data = packet + ETHER_HDR_SIZE + IP_BASE_HDR_SIZE + TCP_BASE_HDR_SIZE;
+	memcpy(tcp_data, buf, tsk->snd_wnd);
+	tcp_send_packet(tsk, packet, pkt_len);
+	return 0;
+}

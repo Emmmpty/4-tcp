@@ -112,3 +112,19 @@ void *tcp_client(void *arg)
  main 里面使用raw_socket来接收原生套接字,然后把数据数据包传递给我们写的socket去处理。我们写的代码是用户层的代码，直接在用户层“模拟”出来了一个tcp协议栈。
 
  tcp_stack.py 也实现了一个tcp服务端和tcp客户端,但是他们使用的系统的tcp协议栈。这个文件是为了检测 我们现实的协议栈能否跟标注的协议栈进行通信。
+
+
+
+## 实验过程
+
+1、因为tcp_sock是tcp连接通信的核心，首先整理tcp连接代码逻辑
+
+```c
+
+// lookup tcp sock in established_table with key (saddr, daddr, sport, dport)
+
+```
+
+2、tcp_in
+
+3、tcp_timer
