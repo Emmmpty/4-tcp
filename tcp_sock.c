@@ -96,7 +96,7 @@ struct tcp_sock *tcp_sock_lookup_established(u32 saddr, u32 daddr, u16 sport, u1
 {
 	//fprintf(stdout, "TODO: implement %s please.\n", __FUNCTION__);
 
-	/*ÒÑÓÐÁ¬½ÓËÄÔª×é²éÕÒ*/
+	/*å·²æœ‰è¿žæŽ¥å››å…ƒç»„æŸ¥æ‰¾*/
 	int hash;
 	struct list_head *list;
 
@@ -121,7 +121,7 @@ struct tcp_sock *tcp_sock_lookup_established(u32 saddr, u32 daddr, u16 sport, u1
 struct tcp_sock *tcp_sock_lookup_listen(u32 saddr, u16 sport)
 {
 	//fprintf(stdout, "TODO: implement %s please.\n", __FUNCTION__);
-	/*¸ù¾ÝÔ´¶Ë¿Ú²éÕÒtcpÌ×½Ó×Ö¶ÔÏó*/
+	/*æ ¹æ®æºç«¯å£æŸ¥æ‰¾tcpå¥—æŽ¥å­—å¯¹è±¡*/
 	int hash;
 	struct list_head *list;
 
@@ -375,10 +375,12 @@ int tcp_sock_read(struct tcp_sock *tsk, char *buf, int size)
 	int read_size = 0;
 	if (ring_buffer_empty(tsk->rcv_buf))
 	{
-		sleep_on(tsk->wait_recv);
+        if(tsk->state != TCP_CLOSE_WAIT)
+            sleep_on(tsk->wait_recv);
 	}
 	read_size = read_ring_buffer(tsk->rcv_buf, buf, size);
 	tsk->rcv_wnd += read_size;
+	//tcp_send_control_packet(tsk, TCP_ACK);
 	log(DEBUG, "tcp_sock read %d bytes of data.", read_size);
 
 	return read_size;
@@ -388,10 +390,17 @@ int tcp_sock_read(struct tcp_sock *tsk, char *buf, int size)
 int tcp_sock_write(struct tcp_sock *tsk, char *buf, int size)
 {
 	//fprintf(stdout, "TODO: implement %s please.\n", __FUNCTION__);
-
-	tcp_send_data(tsk, buf, size);
-
-	return 0;
+    int write_size = 0;
+    while(write_size<size)
+    {
+        int intent_snd = min(size-write_size,1400);
+        while(tsk->snd_wnd < intent_snd)
+            //if send buffer has enough space.
+            sleep_on(tsk->wait_send);
+        tcp_send_data(tsk, buf+write_size,intent_snd);
+        write_size+=intent_snd;
+    }
+	return write_size;
 }
 
 // close the tcp sock, by releasing the resources, sending FIN/RST packet
@@ -414,12 +423,12 @@ void tcp_sock_close(struct tcp_sock *tsk)
 	case TCP_SYN_SENT:
 		break;
 	case TCP_ESTABLISHED:
-		tcp_send_control_packet(tsk, TCP_FIN);
+		tcp_send_control_packet(tsk, TCP_FIN | TCP_ACK);
 		printf("[TCP_ESTABLISHED]:active close,tcp send FIN,only send FIN\n");
 		tcp_set_state(tsk, TCP_FIN_WAIT_1);
 		break;
 	case TCP_CLOSE_WAIT:
-		tcp_send_control_packet(tsk, TCP_FIN);
+		tcp_send_control_packet(tsk, TCP_FIN|TCP_ACK);
 		tcp_set_state(tsk, TCP_LAST_ACK);
 		break;
 	}

@@ -21,7 +21,7 @@ struct sock_addr {
 
 // the main structure that manages a connection locally
 struct tcp_sock {
-	// sk_ip, sk_sport, sk_sip, sk_dport are the 4-tuple that represents a 
+	// sk_ip, sk_sport, sk_sip, sk_dport are the 4-tuple that represents a
 	// connection
 	struct sock_addr local;
 	struct sock_addr peer;
@@ -30,25 +30,25 @@ struct tcp_sock {
 #define sk_dip peer.ip
 #define sk_dport peer.port
 
-	// pointer to parent tcp sock, a tcp sock which bind and listen to a port 
+	// pointer to parent tcp sock, a tcp sock which bind and listen to a port
 	// is the parent of tcp socks when *accept* a connection request
 	struct tcp_sock *parent;
 
-	// represents the number that the tcp sock is referred, if this number 
+	// represents the number that the tcp sock is referred, if this number
 	// decreased to zero, the tcp sock should be released
 	int ref_cnt;
 
-	// hash_list is used to hash tcp sock into listen_table or established_table, 
+	// hash_list is used to hash tcp sock into listen_table or established_table,
 	// bind_hash_list is used to hash into bind_table
 	struct list_head hash_list;
 	struct list_head bind_hash_list;
 
-	// when a passively opened tcp sock receives a SYN packet, it mallocs a child 
-	// tcp sock to serve the incoming connection, which is pending in the 
+	// when a passively opened tcp sock receives a SYN packet, it mallocs a child
+	// tcp sock to serve the incoming connection, which is pending in the
 	// listen_queue of parent tcp sock
 	struct list_head listen_queue;
-	// when receiving the last packet (ACK) of the 3-way handshake, the tcp sock 
-	// in listen_queue will be moved into accept_queue, waiting for *accept* by 
+	// when receiving the last packet (ACK) of the 3-way handshake, the tcp sock
+	// in listen_queue will be moved into accept_queue, waiting for *accept* by
 	// parent tcp sock
 	struct list_head accept_queue;
 
@@ -87,20 +87,20 @@ struct tcp_sock {
 	u32 iss;
 
 	// the highest byte that is ACKed by peer
-	u32 snd_una;
+	u32 snd_una;//remote acked.
 	// the highest byte sent
-	u32 snd_nxt;
+	u32 snd_nxt;//myself send.
 
 	// the highest byte ACKed by itself (i.e. the byte expected to receive next)
-	u32 rcv_nxt;
+	u32 rcv_nxt;//mysefl acked
 
 	// used to indicate the end of fast recovery
-	u32 recovery_point;		
+	u32 recovery_point;
 
 	// min(adv_wnd, cwnd)
 	u32 snd_wnd;
 	// the receiving window advertised by peer
-	u16 adv_wnd;
+	u16 adv_wnd;//peer's recv windows
 
 	// the size of receiving window (advertised by tcp sock itself)
 	u16 rcv_wnd;

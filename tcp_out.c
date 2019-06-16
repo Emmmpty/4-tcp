@@ -26,10 +26,10 @@ static void tcp_init_hdr(struct tcphdr *tcp, u16 sport, u16 dport, u32 seq, u32 
 
 // send a tcp packet
 //
-// Given that the payload of the tcp packet has been filled, initialize the tcp 
-// header and ip header (remember to set the checksum in both header), and emit 
+// Given that the payload of the tcp packet has been filled, initialize the tcp
+// header and ip header (remember to set the checksum in both header), and emit
 // the packet by calling ip_send_packet.
-void tcp_send_packet(struct tcp_sock *tsk, char *packet, int len) 
+void tcp_send_packet(struct tcp_sock *tsk, char *packet, int len)
 {
 	struct iphdr *ip = packet_to_ip_hdr(packet);
 	struct tcphdr *tcp = (struct tcphdr *)((char *)ip + IP_BASE_HDR_SIZE);
@@ -47,7 +47,7 @@ void tcp_send_packet(struct tcp_sock *tsk, char *packet, int len)
 	u16 rwnd = tsk->rcv_wnd;
 
 	tcp_init_hdr(tcp, sport, dport, seq, ack, TCP_PSH|TCP_ACK, rwnd);
-	ip_init_hdr(ip, saddr, daddr, ip_tot_len, IPPROTO_TCP); 
+	ip_init_hdr(ip, saddr, daddr, ip_tot_len, IPPROTO_TCP);
 
 	tcp->checksum = tcp_checksum(ip, tcp);
 
@@ -62,7 +62,7 @@ void tcp_send_packet(struct tcp_sock *tsk, char *packet, int len)
 // send a tcp control packet
 //
 // The control packet is like TCP_ACK, TCP_SYN, TCP_FIN (excluding TCP_RST).
-// All these packets do not have payload and the only difference among these is 
+// All these packets do not have payload and the only difference among these is
 // the flags.
 void tcp_send_control_packet(struct tcp_sock *tsk, u8 flags)
 {
@@ -92,7 +92,7 @@ void tcp_send_control_packet(struct tcp_sock *tsk, u8 flags)
 
 // send tcp reset packet
 //
-// Different from tcp_send_control_packet, the fields of reset packet is 
+// Different from tcp_send_control_packet, the fields of reset packet is
 // from tcp_cb instead of tcp_sock.
 void tcp_send_reset(struct tcp_cb *cb)
 {
@@ -115,13 +115,12 @@ void tcp_send_reset(struct tcp_cb *cb)
 }
 
 int tcp_send_data(struct tcp_sock *tsk, char *buf, int len) {
-	tsk->snd_wnd = len;
-	int pkt_len = ETHER_HDR_SIZE + IP_BASE_HDR_SIZE + TCP_BASE_HDR_SIZE + tsk->snd_wnd;
+	int pkt_len = ETHER_HDR_SIZE + IP_BASE_HDR_SIZE + TCP_BASE_HDR_SIZE + len;
 	char *packet = (char*)malloc(pkt_len);
 	if (packet == NULL)
 		return -1;
 	char* tcp_data = packet + ETHER_HDR_SIZE + IP_BASE_HDR_SIZE + TCP_BASE_HDR_SIZE;
-	memcpy(tcp_data, buf, tsk->snd_wnd);
+	memcpy(tcp_data, buf,len);
 	tcp_send_packet(tsk, packet, pkt_len);
 	return 0;
 }

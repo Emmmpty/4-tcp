@@ -29,6 +29,7 @@ void tcp_state_listen(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 	c_tsk->rcv_nxt = cb->seq_end;
 
 	c_tsk->parent = tsk;
+	c_tsk->snd_wnd = cb->rwnd;
 
 	list_add_tail(&c_tsk->list, &tsk->listen_queue);
 
@@ -56,12 +57,14 @@ void tcp_state_closed(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 void tcp_state_syn_sent(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 {
 	// fprintf(stdout, "TODO:[tcp_in.c][tcp_state_syn_sent] implement this function please.\n");
-	if (cb->flags != (TCP_SYN | TCP_ACK))
+	if (!(cb->flags &(TCP_SYN | TCP_ACK)))
 	{
 		tcp_send_reset(cb);
 		return;
 	}
 	tsk->rcv_nxt = cb->seq_end;
+	tsk->snd_wnd = cb->rwnd;
+
 	tcp_send_control_packet(tsk, TCP_ACK);
 	tcp_set_state(tsk, TCP_ESTABLISHED);
 	wake_up(tsk->wait_connect);
@@ -74,6 +77,7 @@ static inline void tcp_update_window(struct tcp_sock *tsk, struct tcp_cb *cb)
 {
 	u16 old_snd_wnd = tsk->snd_wnd;
 	tsk->snd_wnd = cb->rwnd;
+	printf("update snd_wnd:%d->%d\n",old_snd_wnd,cb->rwnd);
 	if (old_snd_wnd == 0)
 		wake_up(tsk->wait_send);
 }
@@ -124,6 +128,7 @@ int tcp_recv_data(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 {
 	// fprintf(stdout, "TODO:[tcp_in.c][tcp_recv_data] implement this function please.\n");
 	write_ring_buffer(tsk->rcv_buf, cb->payload, cb->pl_len);
+	tsk->rcv_wnd -=cb->pl_len;
 	wake_up(tsk->wait_recv);
 	return 0;
 }
@@ -153,24 +158,23 @@ void tcp_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 
 	char cb_flags[32];
 	tcp_copy_flags_to_str(cb->flags, cb_flags);
-	log(DEBUG, "recived tcp packet %s", cb_flags);
-	switch (tsk->state)
-	{
-	case TCP_CLOSED:
-		tcp_state_closed(tsk, cb, packet);
+    if (cb->flags !=TCP_ACK)
+        log(DEBUG, "recived tcp packet %s", cb_flags);
+    if(tsk->state == TCP_CLOSED)
+    {
+        tcp_state_closed(tsk,cb,packet);
+        return ;
+    }
+    if((tsk->state == TCP_LISTEN) && (cb->flags & TCP_SYN ))
+    {
+        tcp_state_listen(tsk,cb,packet);
+        return ;
+    }
+    if((tsk->state == TCP_SYN_SENT) && (cb->flags & (TCP_SYN|TCP_ACK)))
+    {
+        tcp_state_syn_sent(tsk, cb, packet);
 		return;
-		break;
-	case TCP_LISTEN:
-		tcp_state_listen(tsk, cb, packet);
-		return;
-		break;
-	case TCP_SYN_SENT:
-		tcp_state_syn_sent(tsk, cb, packet);
-		return;
-		break;
-	default:
-		break;
-	}
+    }
 
 	if (!is_tcp_seq_valid(tsk, cb))
 	{
@@ -179,7 +183,13 @@ void tcp_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 		return;
 	}
 
-	if (cb->flags & TCP_RST)
+	if ((tsk->state == TCP_SYN_RECV) && (cb->flags &TCP_ACK))
+	{
+		tcp_state_syn_recv(tsk, cb, packet);
+		return;
+	}
+
+    if (cb->flags & TCP_RST)
 	{
 		//close this connection, and release the resources of this tcp sock
 		tcp_set_state(tsk, TCP_CLOSED);
@@ -187,7 +197,7 @@ void tcp_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 		return;
 	}
 
-	if (cb->flags & TCP_RST)
+	if (cb->flags & TCP_SYN)
 	{
 		//reply with TCP_RST and close this connection
 		tcp_send_reset(cb);
@@ -195,39 +205,15 @@ void tcp_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 		tcp_unhash(tsk);
 		return;
 	}
-	//process the ack of the packet
-	if (tsk->state == TCP_SYN_RECV)
-	{
-		tcp_state_syn_recv(tsk, cb, packet);
-		return;
-	}
-	if (tsk->state == TCP_FIN_WAIT_1 && (cb->flags & TCP_ACK))
-	{
-        //active close:current in TCP_FIN_WAIT_1,
-        //when recv TCP_ACK,THEN go to  TCP_FIN_WAIT_2
-		tcp_set_state(tsk, TCP_FIN_WAIT_2);
-		return;
-	}
-	if (tsk->state == TCP_LAST_ACK && (cb->flags & TCP_ACK))
-	{
-        //passive close:current in LAST_ACK
-        //when recv ACK,Then go to TCP_CLOSED
-		tcp_set_state(tsk, TCP_CLOSED);
-		tcp_unhash(tsk);
-		return;
-	}
-	if (tsk->state == TCP_FIN_WAIT_2 && (cb->flags & TCP_FIN))
-	{
-        //active close : current in TCP_FIN_WAIT_2
-        //when recv TCP_FIN ,Then go to TIME_WAIT
 
-		tsk->rcv_nxt = cb->seq_end;
-		tcp_send_control_packet(tsk, TCP_ACK);
-		// start a timer
-		tcp_set_timewait_timer(tsk);
-		tcp_set_state(tsk, TCP_TIME_WAIT);
+    if (!(cb->flags & TCP_ACK))
+	{
+		//drop
+		log(ERROR, "received tcp packet without ack, drop it.");
 		return;
 	}
+
+
 
 	if ((cb->flags & TCP_FIN) && tsk->state==TCP_ESTABLISHED)
 	{
@@ -242,28 +228,52 @@ void tcp_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
         wake_up(tsk->wait_recv);
 		return;
 	}
+	if (tsk->state == TCP_FIN_WAIT_1 && (cb->flags & TCP_ACK))
+	{
+        //active close:current in TCP_FIN_WAIT_1,
+        //when recv TCP_ACK,THEN go to  TCP_FIN_WAIT_2
+		tcp_set_state(tsk, TCP_FIN_WAIT_2);
+		return;
+	}
 
+	if (tsk->state == TCP_FIN_WAIT_2 && (cb->flags & TCP_FIN))
+	{
+        //active close : current in TCP_FIN_WAIT_2
+        //when recv TCP_FIN ,Then go to TIME_WAIT
+
+		tsk->rcv_nxt = cb->seq_end;
+		tcp_send_control_packet(tsk, TCP_ACK);
+		// start a timer
+		tcp_set_timewait_timer(tsk);
+		tcp_set_state(tsk, TCP_TIME_WAIT);
+		return;
+	}
+
+	if (tsk->state == TCP_LAST_ACK && (cb->flags & TCP_ACK))
+	{
+        //passive close:current in LAST_ACK
+        //when recv ACK,Then go to TCP_CLOSED
+		tcp_set_state(tsk, TCP_CLOSED);
+		tcp_unhash(tsk);
+		return;
+	}
+
+    //process the ack of the packet
 	//update rcv_wnd
-	tsk->rcv_wnd -= cb->pl_len;
+	//update advised wnd
+	tsk->adv_wnd = cb->rwnd;
 	//update snd_wnd
 	tcp_update_window_safe(tsk, cb);
 	//recive data
 	if (cb->pl_len > 0)
+	{
 		tcp_recv_data(tsk, cb, packet);
 
-	//reply with TCP_ACK if the connection is alive
-	/*
-	if (cb->flags != TCP_ACK)
-	{
-		tsk->rcv_nxt = cb->seq_end;
-		tcp_send_control_packet(tsk, TCP_ACK);
-	}
-
-	if (!(cb->flags & TCP_ACK))
-	{
-		//drop
-		log(ERROR, "received tcp packet without ack, drop it.");
-		return;
-	}
-	*/
+        //reply with TCP_ACK if the connection is alive
+        if(tsk->state!=TCP_LAST_ACK)
+        {
+            tsk->rcv_nxt = cb->seq_end;
+            tcp_send_control_packet(tsk, TCP_ACK);
+        }
+    }
 }
