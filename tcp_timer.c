@@ -19,12 +19,26 @@ void tcp_scan_timer_list()
 		if (t->timeout <= 0) {
 			list_delete_entry(&t->list);
 
+
+			if(t->type == 0)
 			// only support time wait now
-			tsk = timewait_to_tcp_sock(t);
-			if (!tsk->parent)
-				tcp_bind_unhash(tsk);
-			tcp_set_state(tsk, TCP_CLOSED);
-			free_tcp_sock(tsk);
+			{
+                tsk = timewait_to_tcp_sock(t);
+                if (!tsk->parent)
+                    tcp_bind_unhash(tsk);
+                tcp_set_state(tsk, TCP_CLOSED);
+                free_tcp_sock(tsk);
+			}
+			if(t->type==1)
+			//retransmiss timer
+			//"TODO: implement %s please.\n", __FUNCTION__);
+			{
+                tsk = retranstimer_to_tcp_sock(t);
+                struct tcp_packet_cache * item= list_entry(tsk->send_buf->next,tcp_packet_cache, list);
+                tcp_retransmiss_packet(tsk,item->data,item->len,item->seq,item->retrans_count+1);
+                item->retrans_count +=1;
+			}
+
 		}
 	}
 }
@@ -46,7 +60,13 @@ void tcp_set_timewait_timer(struct tcp_sock *tsk)
 // set the retrans timer of a tcp sock, by adding the timer into timer_list
 void tcp_set_retrans_timer(struct tcp_sock *tsk)
 {
-	fprintf(stdout, "TODO: implement %s please.\n", __FUNCTION__);
+	//fprintf(stdout, "TODO: implement %s please.\n", __FUNCTION__);
+    struct tcp_timer *retrans_timer = &tsk->retrans_timer;
+    retrans_timer->type = 1;
+    retrans_timer->timeout = TCP_RETRANS_INTERVAL_INITIAL;
+    list_add_tail(&retrans_timer->list,&time_list);
+
+    tcp_sock_inc_ref_cnt(tsk);
 }
 
 // unset the retrans timer of a tcp sock, by removing the timer from timer_list

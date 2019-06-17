@@ -92,7 +92,7 @@ struct tcp_sock {
 	u32 snd_nxt;//myself send.
 
 	// the highest byte ACKed by itself (i.e. the byte expected to receive next)
-	u32 rcv_nxt;//mysefl acked
+	u32 rcv_nxt;//myself acked
 
 	// used to indicate the end of fast recovery
 	u32 recovery_point;
@@ -110,6 +110,11 @@ struct tcp_sock {
 
 	// slow start threshold
 	u32 ssthresh;
+
+	// RTO, Retransmis Timeout
+    u32 RTO;
+    //Estimated RTT
+    u32 eRTT;
 };
 
 void tcp_set_state(struct tcp_sock *tsk, int state);

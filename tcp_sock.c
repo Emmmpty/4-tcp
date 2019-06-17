@@ -5,6 +5,7 @@
 #include "ip.h"
 #include "rtable.h"
 #include "log.h"
+#include "tcp_packet_cache.h"
 
 // TCP socks should be hashed into table for later lookup: Those which
 // occupy a port (either by *bind* or *connect*) should be hashed into
@@ -52,9 +53,22 @@ struct tcp_sock *alloc_tcp_sock()
 	tsk->state = TCP_CLOSED;
 	tsk->rcv_wnd = TCP_DEFAULT_WINDOW;
 
+	//init state
+    tsk->iss =  0;
+    tsk->snd_una = 0;
+    tsk->snd_nxt = 0;
+
+    //init timer
+
+    //init_list_head(&tsk->timewait.list)
+    //init_list_head(&tsk->retrans_timer.list);
+
 	init_list_head(&tsk->list);
 	init_list_head(&tsk->listen_queue);
 	init_list_head(&tsk->accept_queue);
+
+	init_list_head(&tsk->send_buf);//init send buf
+	init_list_head(&tsk->rcv_ofo_buf);//init recv out of order buffer.
 
 	tsk->rcv_buf = alloc_ring_buffer(tsk->rcv_wnd);
 
@@ -393,7 +407,7 @@ int tcp_sock_write(struct tcp_sock *tsk, char *buf, int size)
     int write_size = 0;
     while(write_size<size)
     {
-        int intent_snd = min(size-write_size,1400);
+        int intent_snd = min(size-write_size,1460);
         while(tsk->snd_wnd < intent_snd)
             //if send buffer has enough space.
             sleep_on(tsk->wait_send);

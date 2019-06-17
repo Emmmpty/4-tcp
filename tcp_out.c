@@ -5,10 +5,22 @@
 
 #include "log.h"
 #include "list.h"
+#include "tcp_packet_cache.h"
 
 #include <stdlib.h>
 #include <string.h>
 
+//add a packet to tcp send_buf.
+void tcp_add_send_buf(struct *tcp_sock *tsk,char *packet,int len,u32 seq)
+{
+    struct tcp_packet_cache * item = (struct tcp_packet_cache*)malloc(sizeof(struct tcp_packet_cache));
+    item->len = len;
+    item->seq = seq;
+    item->data = (char *) malloc(len);
+    memcpy(item->data,packet,len);
+    list_add_tail(item,&tsk->send_buf);
+
+}
 // initialize tcp header according to the arguments
 static void tcp_init_hdr(struct tcphdr *tcp, u16 sport, u16 dport, u32 seq, u32 ack,
 		u8 flags, u16 rwnd)
@@ -53,10 +65,47 @@ void tcp_send_packet(struct tcp_sock *tsk, char *packet, int len)
 
 	ip->checksum = ip_checksum(ip);
 
+    //need check!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	tsk->snd_nxt += tcp_data_len;
 	tsk->snd_wnd -= tcp_data_len;
 
 	ip_send_packet(packet, len);
+
+    tcp_add_send_buf(tsk,packet,len,seq);
+}
+
+//retransmiss a packet.
+
+void tcp_retransmiss_packet(struct tcp_sock * tsk,char *packet, int len,u32 seq,int retrans_count)
+{
+	struct iphdr *ip = packet_to_ip_hdr(packet);
+	struct tcphdr *tcp = (struct tcphdr *)((char *)ip + IP_BASE_HDR_SIZE);
+
+	int ip_tot_len = len - ETHER_HDR_SIZE;
+	int tcp_data_len = ip_tot_len - IP_BASE_HDR_SIZE - TCP_BASE_HDR_SIZE;
+
+	u32 saddr = tsk->sk_sip;
+	u32	daddr = tsk->sk_dip;
+	u16 sport = tsk->sk_sport;
+	u16 dport = tsk->sk_dport;
+
+	u32 ack = tsk->rcv_nxt;
+	u16 rwnd = tsk->rcv_wnd;
+
+	tcp_init_hdr(tcp, sport, dport, seq, ack, TCP_PSH|TCP_ACK, rwnd);
+	ip_init_hdr(ip, saddr, daddr, ip_tot_len, IPPROTO_TCP);
+
+	tcp->checksum = tcp_checksum(ip, tcp);
+
+	ip->checksum = ip_checksum(ip);
+
+	//tsk->snd_nxt += tcp_data_len;
+	//tsk->snd_wnd -= tcp_data_len;
+
+	ip_send_packet(packet, len);
+	tsk->retrans_timer.timeout = min(64*1000*1000,tsk->RTO*(2<<retrans_count) );// set the retramsfer
+
+
 }
 
 // send a tcp control packet
@@ -85,8 +134,10 @@ void tcp_send_control_packet(struct tcp_sock *tsk, u8 flags)
 	tcp->checksum = tcp_checksum(ip, tcp);
 
 	if (flags & (TCP_SYN|TCP_FIN))
+	{
+        tcp_add_send_buf(tsk,packet,pkt_size,tsk->snd_nxt);
 		tsk->snd_nxt += 1;
-
+    }
 	ip_send_packet(packet, pkt_size);
 }
 

@@ -261,6 +261,7 @@ void tcp_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
     //process the ack of the packet
 	//update rcv_wnd
 	//update advised wnd
+
 	tsk->adv_wnd = cb->rwnd;
 	//update snd_wnd
 	tcp_update_window_safe(tsk, cb);
