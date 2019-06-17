@@ -131,3 +131,10 @@ void *tcp_client(void *arg)
 
 ## Process
 1. alloc_tcp_sock, the initiate recv_window size if 65535
+2. List Operate Process
+  First : init_list_head   (set a list)
+  Second: add to tail, list_add_tail (struct list_head * new,struct list_head * head)
+          add to head
+	  the new item itself should be contained by a struct.
+  Third: get_info : call list_entry(ptr,type,member)  ,ptr should point the member of type. it return the type pointer.
+  Delete: list_delete_entry( struct list_head * entry) ,pick off the entry from the list it linked,but not call free()
