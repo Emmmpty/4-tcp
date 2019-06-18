@@ -58,8 +58,9 @@ struct tcp_sock *alloc_tcp_sock()
     tsk->snd_una = 0;
     tsk->snd_nxt = 0;
 
-    //init timer
 
+    tsk->RTO = TCP_RETRANS_INTERVAL_INITIAL ;
+    //init timer
     //init_list_head(&tsk->timewait.list)
     //init_list_head(&tsk->retrans_timer.list);
 
@@ -405,12 +406,16 @@ int tcp_sock_write(struct tcp_sock *tsk, char *buf, int size)
 {
 	//fprintf(stdout, "TODO: implement %s please.\n", __FUNCTION__);
     int write_size = 0;
-    while(write_size<size)
+    while(write_size<size )
     {
         int intent_snd = min(size-write_size,1460);
-        while(tsk->snd_wnd < intent_snd)
-            //if send buffer has enough space.
-            sleep_on(tsk->wait_send);
+        while((intent_snd  + tsk->snd_nxt-tsk->snd_una) > tsk->snd_wnd)
+            //if send wnd doest have enough space,the sleep on. infly bytes=tsk->snd_nxt - tsk->snd_una
+            {
+                printf("wait for free space to send(%d,%d,%d,%d)...\n",intent_snd,tsk->snd_nxt,tsk->snd_una,tsk->snd_wnd);
+                sleep_on(tsk->wait_send);
+                printf("wake up from wait_send(%d,%d,%d,%d)...\n",intent_snd,tsk->snd_nxt,tsk->snd_una,tsk->snd_wnd);
+            }
         tcp_send_data(tsk, buf+write_size,intent_snd);
         write_size+=intent_snd;
     }

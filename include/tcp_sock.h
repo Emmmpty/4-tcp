@@ -141,7 +141,8 @@ void tcp_send_reset(struct tcp_cb *cb);
 
 void tcp_send_control_packet(struct tcp_sock *tsk, u8 flags);
 void tcp_send_packet(struct tcp_sock *tsk, char *packet, int len);
-int tcp_send_data(struct tcp_sock *tsk, char *buf, int len);
+int  tcp_send_data(struct tcp_sock *tsk, char *buf, int len);
+void tcp_retrans_packet(struct tcp_sock * tsk,char *packet, int len,u32 seq,int retrans_count);
 
 void tcp_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet);
 

@@ -80,7 +80,7 @@ void *tcp_client(void *arg)
         printf("send %d bytes.\n",ret_size);
         total_cnt +=ret_size;
         if (ret_size < BUF_SIZE) break;
-        usleep(1000*20);
+        //usleep(1000*20);
     }
 
     fclose(file);

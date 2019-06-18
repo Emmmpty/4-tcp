@@ -12,9 +12,9 @@
 #define greater_or_equal_32b(a, b) (((int32_t)(a)-(int32_t)(b)) >= 0)
 #define greater_than_32b(a, b) (((int32_t)(a)-(int32_t)(b)) > 0)
 
-// format of standard tcp header 
+// format of standard tcp header
 struct tcphdr {
-	u16 sport;		// source port 
+	u16 sport;		// source port
 	u16 dport;		// destination port
 	u32 seq;			// sequence number
 	u32 ack;			// acknowledgement number
@@ -41,7 +41,7 @@ struct tcphdr {
 #define TCP_BASE_HDR_SIZE 20
 #define TCP_HDR_SIZE(tcp) (tcp->off * 4)
 
-#define TCP_DEFAULT_WINDOW 65535
+#define TCP_DEFAULT_WINDOW 4000
 
 // control block, representing all the necesary information of a packet
 struct tcp_cb {

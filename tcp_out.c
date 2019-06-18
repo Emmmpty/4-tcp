@@ -11,14 +11,25 @@
 #include <string.h>
 
 //add a packet to tcp send_buf.
-void tcp_add_send_buf(struct *tcp_sock *tsk,char *packet,int len,u32 seq)
+void tcp_add_send_buf(struct tcp_sock *tsk,char *packet,int len,u32 seq,u32 seq_end)
 {
     struct tcp_packet_cache * item = (struct tcp_packet_cache*)malloc(sizeof(struct tcp_packet_cache));
     item->len = len;
     item->seq = seq;
+    item->seq_end = seq_end;
+    item->retrans_count = 0;
     item->data = (char *) malloc(len);
     memcpy(item->data,packet,len);
-    list_add_tail(item,&tsk->send_buf);
+    if(list_empty(&tsk->send_buf))
+    {
+        list_add_tail(&item->list,&tsk->send_buf);
+        tcp_set_retrans_timer(tsk);
+    }
+    else
+    {
+        list_add_tail(&item->list,&tsk->send_buf);
+    }
+
 
 }
 // initialize tcp header according to the arguments
@@ -66,17 +77,19 @@ void tcp_send_packet(struct tcp_sock *tsk, char *packet, int len)
 	ip->checksum = ip_checksum(ip);
 
     //need check!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	tsk->snd_nxt += tcp_data_len;
-	tsk->snd_wnd -= tcp_data_len;
-
+    tsk->snd_nxt += tcp_data_len;
+	//tsk->snd_wnd -= tcp_data_len;
 	ip_send_packet(packet, len);
 
-    tcp_add_send_buf(tsk,packet,len,seq);
+    tcp_add_send_buf(tsk,packet,len,seq,tsk->snd_nxt);
+
+
+
 }
 
 //retransmiss a packet.
 
-void tcp_retransmiss_packet(struct tcp_sock * tsk,char *packet, int len,u32 seq,int retrans_count)
+void tcp_retrans_packet(struct tcp_sock * tsk,char *packet, int len,u32 seq,int retrans_count)
 {
 	struct iphdr *ip = packet_to_ip_hdr(packet);
 	struct tcphdr *tcp = (struct tcphdr *)((char *)ip + IP_BASE_HDR_SIZE);
@@ -103,7 +116,8 @@ void tcp_retransmiss_packet(struct tcp_sock * tsk,char *packet, int len,u32 seq,
 	//tsk->snd_wnd -= tcp_data_len;
 
 	ip_send_packet(packet, len);
-	tsk->retrans_timer.timeout = min(64*1000*1000,tsk->RTO*(2<<retrans_count) );// set the retramsfer
+	printf("retrans:  seq:%d,ack:%d,count:%d.\n",seq,ack,retrans_count);
+	//tsk->retrans_timer.timeout = min(64*1000*1000,tsk->RTO*(2<<retrans_count) );// set the retramsfer
 
 
 }
@@ -135,7 +149,7 @@ void tcp_send_control_packet(struct tcp_sock *tsk, u8 flags)
 
 	if (flags & (TCP_SYN|TCP_FIN))
 	{
-        tcp_add_send_buf(tsk,packet,pkt_size,tsk->snd_nxt);
+        tcp_add_send_buf(tsk,packet,pkt_size,tsk->snd_nxt,tsk->snd_nxt+1);
 		tsk->snd_nxt += 1;
     }
 	ip_send_packet(packet, pkt_size);

@@ -4,7 +4,7 @@
 
 #include "log.h"
 #include "ring_buffer.h"
-
+#include "tcp_packet_cache.h"
 #include <stdlib.h>
 
 // handling incoming packet for TCP_LISTEN state
@@ -30,6 +30,7 @@ void tcp_state_listen(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 
 	c_tsk->parent = tsk;
 	c_tsk->snd_wnd = cb->rwnd;
+
 
 	list_add_tail(&c_tsk->list, &tsk->listen_queue);
 
@@ -57,14 +58,14 @@ void tcp_state_closed(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 void tcp_state_syn_sent(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 {
 	// fprintf(stdout, "TODO:[tcp_in.c][tcp_state_syn_sent] implement this function please.\n");
-	if (!(cb->flags &(TCP_SYN | TCP_ACK)))
+	if (!(cb->flags &(TCP_SYN | TCP_ACK)) || cb->ack!=tsk->snd_nxt)
 	{
 		tcp_send_reset(cb);
 		return;
 	}
 	tsk->rcv_nxt = cb->seq_end;
 	tsk->snd_wnd = cb->rwnd;
-
+    tsk->snd_una = cb->ack;
 	tcp_send_control_packet(tsk, TCP_ACK);
 	tcp_set_state(tsk, TCP_ESTABLISHED);
 	wake_up(tsk->wait_connect);
@@ -76,7 +77,7 @@ void tcp_state_syn_sent(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 static inline void tcp_update_window(struct tcp_sock *tsk, struct tcp_cb *cb)
 {
 	u16 old_snd_wnd = tsk->snd_wnd;
-	tsk->snd_wnd = cb->rwnd;
+	tsk->snd_wnd = min(cb->rwnd,4096);
 	printf("update snd_wnd:%d->%d\n",old_snd_wnd,cb->rwnd);
 	if (old_snd_wnd == 0)
 		wake_up(tsk->wait_send);
@@ -100,6 +101,11 @@ void tcp_state_syn_recv(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 	// fprintf(stdout, "TODO:[tcp_in.c][tcp_state_syn_recv] implement this function please.\n");
 	list_delete_entry(&tsk->list);
 	tcp_sock_accept_enqueue(tsk);
+
+    tsk->rcv_nxt = cb->seq_end;
+	tsk->snd_wnd = cb->rwnd;
+    //tsk->snd_una = cb->ack;
+
 	tcp_set_state(tsk, TCP_ESTABLISHED);
 	wake_up(tsk->parent->wait_accept);
 }
@@ -132,7 +138,45 @@ int tcp_recv_data(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 	wake_up(tsk->wait_recv);
 	return 0;
 }
+void tcp_ack_data(struct tcp_sock * tsk,struct tcp_cb * cb)
+{
+    u32 ack = cb->ack;
+    char new_acked = 0;
+    if(ack<=tsk->snd_nxt && ack >= tsk->snd_una)
+    {
+        struct tcp_packet_cache * packet_cache_item,*q;
+        list_for_each_entry_safe(packet_cache_item,q,&tsk->send_buf,list)
+        {
+            if(packet_cache_item->seq_end <= ack)
+            // acked
+            {
+                if(packet_cache_item->seq_end > tsk->snd_una)
+                {
+                    tsk->snd_una = packet_cache_item->seq_end;
+                    new_acked = 1;
+                }
 
+                list_delete_entry(&packet_cache_item->list);
+
+                printf("acked:[%d,%d)\n",packet_cache_item->seq,packet_cache_item->seq_end);
+                free(packet_cache_item);
+            }
+        }
+        if(new_acked)
+        {
+            wake_up(tsk->wait_send);
+        }
+        if(!list_empty(&tsk->send_buf))
+        {
+            tsk->retrans_timer.timeout = tsk->RTO;
+            tsk->retrans_timer.enable = 1;
+        }
+        else
+        {
+            tcp_unset_retrans_timer(tsk);//unset retransfer timer.
+
+        }
+    }}
 // Process an incoming packet as follows:
 // 	 1. if the state is TCP_CLOSED, hand the packet over to tcp_state_closed;
 // 	 2. if the state is TCP_LISTEN, hand it over to tcp_state_listen;
@@ -162,7 +206,7 @@ void tcp_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
         log(DEBUG, "recived tcp packet %s", cb_flags);
     if(tsk->state == TCP_CLOSED)
     {
-        tcp_state_closed(tsk,cb,packet);
+        //tcp_state_closed(tsk,cb,packet);
         return ;
     }
     if((tsk->state == TCP_LISTEN) && (cb->flags & TCP_SYN ))
@@ -173,19 +217,14 @@ void tcp_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
     if((tsk->state == TCP_SYN_SENT) && (cb->flags & (TCP_SYN|TCP_ACK)))
     {
         tcp_state_syn_sent(tsk, cb, packet);
+        tcp_ack_data(tsk,cb);
 		return;
     }
-
-	if (!is_tcp_seq_valid(tsk, cb))
-	{
-		// drop
-		log(ERROR, "received tcp packet with invalid seq, drop it.");
-		return;
-	}
 
 	if ((tsk->state == TCP_SYN_RECV) && (cb->flags &TCP_ACK))
 	{
 		tcp_state_syn_recv(tsk, cb, packet);
+		tcp_ack_data(tsk,cb);
 		return;
 	}
 
@@ -215,20 +254,20 @@ void tcp_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 
 
 
-	if ((cb->flags & TCP_FIN) && tsk->state==TCP_ESTABLISHED)
+	if ((cb->flags & TCP_FIN) && tsk->state==TCP_ESTABLISHED && cb->seq == tsk->rcv_nxt)
 	{
 		//update the TCP_STATE accordingly
         //passive close.
 		tsk->rcv_nxt = cb->seq_end;
 		tcp_send_control_packet(tsk, TCP_ACK);
 		tcp_set_state(tsk, TCP_CLOSE_WAIT);
-        printf("[TCP_ESTABLISH]: send ACK,change to TCP_CLOSE_WAIT\n");
+        printf("[TCP_ESTABLISH]: passive close,send ACK,change to TCP_CLOSE_WAIT\n");
 
         //wake up ,to driver process to call tcp_close()
         wake_up(tsk->wait_recv);
 		return;
 	}
-	if (tsk->state == TCP_FIN_WAIT_1 && (cb->flags & TCP_ACK))
+	if (tsk->state == TCP_FIN_WAIT_1 && (cb->flags & TCP_ACK) && cb->ack == tsk->snd_nxt)
 	{
         //active close:current in TCP_FIN_WAIT_1,
         //when recv TCP_ACK,THEN go to  TCP_FIN_WAIT_2
@@ -236,23 +275,26 @@ void tcp_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 		return;
 	}
 
-	if (tsk->state == TCP_FIN_WAIT_2 && (cb->flags & TCP_FIN))
+	if (tsk->state == TCP_FIN_WAIT_2 && (cb->flags & TCP_FIN) && cb->seq == tsk->rcv_nxt)
 	{
         //active close : current in TCP_FIN_WAIT_2
         //when recv TCP_FIN ,Then go to TIME_WAIT
 
+		//tsk->rcv_nxt = cb->seq_end;
 		tsk->rcv_nxt = cb->seq_end;
 		tcp_send_control_packet(tsk, TCP_ACK);
 		// start a timer
 		tcp_set_timewait_timer(tsk);
+
 		tcp_set_state(tsk, TCP_TIME_WAIT);
 		return;
 	}
 
-	if (tsk->state == TCP_LAST_ACK && (cb->flags & TCP_ACK))
+	if (tsk->state == TCP_LAST_ACK && (cb->flags & TCP_ACK) && cb->ack == tsk->snd_nxt )
 	{
         //passive close:current in LAST_ACK
         //when recv ACK,Then go to TCP_CLOSED
+        tcp_ack_data(tsk,cb);
 		tcp_set_state(tsk, TCP_CLOSED);
 		tcp_unhash(tsk);
 		return;
@@ -262,19 +304,106 @@ void tcp_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 	//update rcv_wnd
 	//update advised wnd
 
-	tsk->adv_wnd = cb->rwnd;
-	//update snd_wnd
-	tcp_update_window_safe(tsk, cb);
-	//recive data
+	if (!is_tcp_seq_valid(tsk, cb))
+	{
+		// drop
+		log(ERROR, "received tcp packet with invalid seq, drop it.");
+		return;
+	}
+
+    tcp_ack_data(tsk,cb);
+
+    if (cb->ack < tsk->snd_una)
+        //receive very early reply ack
+    {
+        tcp_send_control_packet(tsk,TCP_ACK);
+    }
+    if(cb->ack > tsk->snd_nxt)
+        //out of range,ack
+    {
+        printf("receive ask(%d) > snd_nxt(%d),drop it!\n",cb->ack,tsk->snd_nxt);
+        return ;
+    }
+
+	//recive data,it has tcp_payload
 	if (cb->pl_len > 0)
 	{
-		tcp_recv_data(tsk, cb, packet);
+	    u32 seq = cb->seq;
+        //ack this packet.
+        u32 seq_end =cb->seq_end;
+        //first insert this payload to ofo
+
+        struct tcp_payload_cache * new_item = (struct tcp_payload_cache*) malloc(sizeof(struct tcp_payload_cache));
+        struct tcp_payload_cache * q;
+        new_item->seq = seq;
+        new_item->seq_end = seq_end;
+        new_item->payload = (char *)malloc(cb->pl_len);
+        new_item->len = cb->pl_len;
+
+        memcpy(new_item->payload,cb->payload,cb->pl_len);
+
+        struct tcp_payload_cache * item;
+        if(!list_empty(&tsk->rcv_ofo_buf))
+        {
+            list_for_each_entry_safe(item,q,&tsk->rcv_ofo_buf,list)
+            {
+                if(item->seq_end==new_item->seq)
+                {
+                    list_insert(&new_item->list,item->list.prev,item->list.next);
+                }
+                else if(item->seq=new_item->seq && item->seq==new_item->seq)
+                //duplicate payload
+                {
+                    list_delete_entry(&item->list);
+                    break;
+                }
+                else if (item->seq_end > item->seq)
+                {
+                    break;
+                }
+            }
+        }
+        else
+        //it's empty
+        {
+            list_add_tail(&new_item->list,&tsk->rcv_ofo_buf);
+        }
+        seq_end = tsk->rcv_nxt;
+        char new_data_recv =0;
+        if(!list_empty(&tsk->rcv_ofo_buf))
+        {
+                list_for_each_entry_safe(item,q,&tsk->rcv_ofo_buf,list)
+                {
+                    if(item->seq == seq_end)
+                    {
+                        new_data_recv =1;
+                        seq_end = item->seq_end;
+                        tsk->rcv_nxt = seq_end;
+                        list_delete_entry(&item->list);
+                        tcp_recv_data(tsk, cb, packet);
+                        write_ring_buffer(tsk->rcv_buf, item->payload,item->len);
+                        tsk->rcv_wnd -=item->len;
+                        wake_up(tsk->wait_recv);
+                        free(item);
+                    }
+                }
+        }
+        if(new_data_recv)
+        {
+            wake_up(tsk->wait_recv);
+        }
+        tsk->adv_wnd = cb->rwnd;
+        //update snd_wnd
+        tcp_update_window_safe(tsk, cb);
+
+
 
         //reply with TCP_ACK if the connection is alive
-        if(tsk->state!=TCP_LAST_ACK)
-        {
-            tsk->rcv_nxt = cb->seq_end;
-            tcp_send_control_packet(tsk, TCP_ACK);
-        }
+        //if(tsk->state!=TCP_LAST_ACK)
+        //{
+         //   tsk->rcv_nxt = cb->seq_end;
+          //  tcp_send_control_packet(tsk, TCP_ACK);
+        //}
     }
+    tcp_send_control_packet(tsk, TCP_ACK);
 }

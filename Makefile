@@ -5,7 +5,7 @@ all: $(TARGET)
 CC = gcc
 LD = gcc
 
-CFLAGS = -g -Wall -Iinclude
+CFLAGS = -g -W -Iinclude
 LDFLAGS = -L.
 
 LIBS = -lipstack -lpthread
@@ -20,7 +20,7 @@ $(OBJS) : %.o : %.c include/*.h
 	$(CC) -c $(CFLAGS) $< -o $@
 
 $(TARGET): $(OBJS)
-	$(LD) $(LDFLAGS) $(OBJS) -o $(TARGET) $(LIBS) 
+	$(LD) $(LDFLAGS) $(OBJS) -o $(TARGET) $(LIBS)
 
 clean:
 	rm -f *.o $(TARGET)
