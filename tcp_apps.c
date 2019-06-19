@@ -9,6 +9,7 @@
 
 // tcp server application, listens to port (specified by arg) and serves only one
 // connection request
+FILE * file_congest;
 void *tcp_server(void *arg)
 {
 	u16 port = *(u16 *)arg;
@@ -77,20 +78,15 @@ void *tcp_client(void *arg)
 	char buf[BUF_SIZE];
 	sleep(5);
 	FILE *file = fopen("client-input.dat", "rb");
-	FILE *file_congest = fopen("client-congest-log.dat","wb");
+	file_congest = fopen("client-congest-log.dat","wb");
 	int total_cnt = 0;
-	struct timezone tz;
-	struct timeval tv;
 	while (!feof(file)) {
         int ret_size = fread(buf, 1, BUF_SIZE, file);
         tcp_sock_write(tsk, buf, ret_size);
         printf("send %d bytes.\n",ret_size);
-        gettimeofday(&tv,&tz);
-        printf("time:%f,cwnd:%f,ssthresh:%f,seq:%d\n",tv.tv_sec+ tv.tv_usec/1000000.0,tsk->cwnd,tsk->ssthresh/MSS,tsk->snd_nxt);
-        fprintf(file_congest,"%f,%f,%f,%d\n",tv.tv_sec+ tv.tv_usec/1000000.0,tsk->cwnd,tsk->ssthresh/MSS,tsk->snd_nxt);
         total_cnt +=ret_size;
         if (ret_size < BUF_SIZE) break;
-        //usleep(1000*20);
+        usleep(1000*20);
     }
     fclose(file_congest);
     fclose(file);

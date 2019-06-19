@@ -37,7 +37,6 @@ void init_tcp_stack()
 
 	for (int i = 0; i < TCP_HASH_SIZE; i++)
 		init_list_head(&tcp_bind_sock_table[i]);
-
 	pthread_t timer;
 	pthread_create(&timer, NULL, tcp_timer_thread, NULL);
 }

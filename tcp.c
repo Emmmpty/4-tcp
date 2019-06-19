@@ -3,7 +3,7 @@
 #include "tcp_sock.h"
 
 #include "log.h"
-
+#include <sys/time.h>
 #include <arpa/inet.h>
 
 const char *tcp_state_str[] = { "CLOSED", "LISTEN", "SYN_RECV",
@@ -17,7 +17,7 @@ u32 tcp_new_iss()
 	return (u32)rand();
 }
 
-static int copy_flag_str(u8 flags, int flag, char *buf, int start, 
+static int copy_flag_str(u8 flags, int flag, char *buf, int start,
 		const char *str, int len)
 {
 	if (flags & flag) {
@@ -63,7 +63,7 @@ void tcp_cb_init(struct iphdr *ip, struct tcphdr *tcp, struct tcp_cb *cb)
 	cb->flags = tcp->flags;
 }
 
-// handle TCP packet: find the appropriate tcp sock, and let the tcp sock 
+// handle TCP packet: find the appropriate tcp sock, and let the tcp sock
 // to process the packet.
 void handle_tcp_packet(char *packet, struct iphdr *ip, struct tcphdr *tcp)
 {
@@ -78,4 +78,15 @@ void handle_tcp_packet(char *packet, struct iphdr *ip, struct tcphdr *tcp)
 	struct tcp_sock *tsk = tcp_sock_lookup(&cb);
 
 	tcp_process(tsk, &cb, packet);
+}
+
+extern FILE *file_congest;
+void congest_time(struct tcp_sock* tsk)
+{
+	struct timezone tz;
+	struct timeval tv;
+    gettimeofday(&tv,&tz);
+    printf("time:%f,cwnd:%f,ssthresh:%f,seq:%d\n",tv.tv_sec+ tv.tv_usec/1000000.0,tsk->cwnd,tsk->ssthresh/MSS,tsk->snd_nxt);
+    if (file_congest)
+        fprintf(file_congest,"%f,%f,%f,%d\n",tv.tv_sec+ tv.tv_usec/1000000.0,tsk->cwnd,tsk->ssthresh/MSS,tsk->snd_nxt);
 }

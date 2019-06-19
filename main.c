@@ -21,7 +21,7 @@
 #include <libgen.h>
 
 ustack_t *instance;
-
+extern FILE * file_congest;
 static iface_info_t *fd_to_iface(int fd)
 {
 	iface_info_t *iface = NULL;
@@ -38,7 +38,7 @@ void handle_packet(iface_info_t *iface, char *packet, int len)
 {
 	struct ether_header *eh = (struct ether_header *)packet;
 
-	// log(DEBUG, "got packet from %s, %d bytes, proto: 0x%04hx\n", 
+	// log(DEBUG, "got packet from %s, %d bytes, proto: 0x%04hx\n",
 	// 		iface->name, len, ntohs(eh->ether_type));
 	switch (ntohs(eh->ether_type)) {
 		case ETH_P_IP:
@@ -57,7 +57,7 @@ void handle_packet(iface_info_t *iface, char *packet, int len)
 int open_device(const char *dname)
 {
 	int sd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
-	if (sd < 0) { 
+	if (sd < 0) {
 		perror("creating SOCK_RAW failed!");
 		return -1;
 	}
@@ -97,7 +97,7 @@ int open_device(const char *dname)
 		return -1;
 	}
 #endif
-	
+
 	return sd;
 }
 
@@ -127,7 +127,7 @@ int read_iface_info(iface_info_t *iface)
 	iface->ip = ntohl(*(u32 *)&ip);
 	strcpy(iface->ip_str, inet_ntoa(ip));
 
-	// get net mask 
+	// get net mask
 	if (ioctl(fd, SIOCGIFNETMASK, &ifr) < 0) {
 		perror("Get IP mask failed");
 		exit(1);
@@ -194,6 +194,8 @@ void init_all_ifaces()
 
 void init_ustack()
 {
+    file_congest =NULL;
+
 	instance = malloc(sizeof(ustack_t));
 
 	bzero(instance, sizeof(ustack_t));

@@ -177,7 +177,7 @@ void tcp_ack_data(struct tcp_sock * tsk,struct tcp_cb * cb)
                 }
 
                 list_delete_entry(&packet_cache_item->list);
-
+                congest_time(tsk);
                 printf("acked:[%d,%d)\n",packet_cache_item->seq,packet_cache_item->seq_end);
                 //free(packet_cache_item);
             }
@@ -195,12 +195,13 @@ void tcp_ack_data(struct tcp_sock * tsk,struct tcp_cb * cb)
                 tsk->ssthresh = max(MSS*2,tsk->cwnd * MSS / 2.0);
                 //tsk->cwnd = tsk->ssthresh/MSS  + 3;
                 tsk->cwnd =1;
+                congest_time(tsk);
                 tcp_retrans(tsk);
             }
-            if(tsk->dupack>3)
-            {
-                tsk->cwnd +=1;
-            }
+            //if(tsk->dupack>3)
+            //{
+            //    tsk->cwnd +=1;
+            //}
         }
         if(!list_empty(&tsk->send_buf))
         {

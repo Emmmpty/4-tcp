@@ -98,4 +98,8 @@ void tcp_copy_flags_to_str(u8 flags, char buf[]);
 void tcp_cb_init(struct iphdr *ip, struct tcphdr *tcp, struct tcp_cb *cb);
 void handle_tcp_packet(char *packet, struct iphdr *ip, struct tcphdr *tcp);
 
+
+
+void congest_time();//log congest info.
+
 #endif

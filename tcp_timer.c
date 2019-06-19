@@ -50,6 +50,7 @@ void tcp_scan_timer_list()
 
                     tsk->ssthresh = MSS*2 > (tsk->cwnd * MSS /2.0)? MSS*2 : (tsk->cwnd * MSS /2.0);
                     tsk->cwnd = 1;
+                    congest_time(tsk);
                 }
                 //else
                 //{
