@@ -11,23 +11,25 @@ static struct list_head timer_list;
 // scan the timer_list, find the tcp sock which stays for at 2*MSL, release it
 void tcp_scan_timer_list()
 {
-	//fprintf(stdout, "TODO: implement %s please.\n", __FUNCTION__);
+	//fprintf(stdout, "call %s .\n", __FUNCTION__);
 
 	struct tcp_sock *tsk;
 	struct tcp_timer *t, *q;
 	list_for_each_entry_safe(t, q, &timer_list, list) {
-        if(t->enable == 0)
-        {
-            continue;
-        }
+        //if(t->enable == 0)
+        //{
+        //    continue;
+        //}
+        //printf("timer:type:%d,enable:%d,timeout:%d\n",t->type,t->enable,t->timeout);
 		t->timeout -= TCP_TIMER_SCAN_INTERVAL;
 		if (t->timeout <= 0) {
-			list_delete_entry(&t->list);
+
 
 
 			if(t->type == 0)
 			// only support time wait now
 			{
+                list_delete_entry(&t->list);
                 tsk = timewait_to_tcp_sock(t);
                 if (!tsk->parent)
                     tcp_bind_unhash(tsk);
@@ -38,13 +40,16 @@ void tcp_scan_timer_list()
 			//retransmiss timer
 			//"TODO: implement %s please.\n", __FUNCTION__);
 			{
+
                 tsk = retranstimer_to_tcp_sock(t);
                 if(!list_empty(&tsk->send_buf))
                 {
+                 //printf("retrans....\n");
                     struct tcp_packet_cache * item= list_entry(tsk->send_buf.next,struct tcp_packet_cache, list);
                     tcp_retrans_packet(tsk,item->data,item->len,item->seq,item->retrans_count+1);
                     item->retrans_count +=1;
-                    t->timeout = tsk->RTO;
+                    t->timeout = tsk->RTO * min(2<< (item->retrans_count),128);
+                    t->enable = 1;
                 }
                 else
                 {
@@ -76,6 +81,7 @@ void tcp_set_retrans_timer(struct tcp_sock *tsk)
 	//fprintf(stdout, "TODO: implement %s please.\n", __FUNCTION__);
     struct tcp_timer *retrans_timer = &tsk->retrans_timer;
     retrans_timer->type = 1;
+    retrans_timer->enable =1;
     retrans_timer->timeout = TCP_RETRANS_INTERVAL_INITIAL;
 
     list_add_tail(&retrans_timer->list,&timer_list);

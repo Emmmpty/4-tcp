@@ -388,12 +388,21 @@ int tcp_sock_read(struct tcp_sock *tsk, char *buf, int size)
 	//fprintf(stdout, "TODO: implement %s please.\n", __FUNCTION__);
 
 	int read_size = 0;
-	if (ring_buffer_empty(tsk->rcv_buf))
+	while (ring_buffer_empty(tsk->rcv_buf))
 	{
-        if(tsk->state != TCP_CLOSE_WAIT)
-            sleep_on(tsk->wait_recv);
+
+        if(tsk->state == TCP_CLOSE_WAIT || tsk->state==TCP_CLOSED || tsk->state==TCP_CLOSING)
+        {
+            break;
+        }
+        sleep_on(tsk->wait_recv);
 	}
 	read_size = read_ring_buffer(tsk->rcv_buf, buf, size);
+	if(read_size==0 &&!(tsk->state == TCP_CLOSE_WAIT || tsk->state==TCP_CLOSED || tsk->state==TCP_CLOSING))
+	{
+        printf("Error\n");
+        exit(-1);
+	}
 	tsk->rcv_wnd += read_size;
 	//tcp_send_control_packet(tsk, TCP_ACK);
 	log(DEBUG, "tcp_sock read %d bytes of data.", read_size);

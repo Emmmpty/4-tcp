@@ -104,8 +104,9 @@ void tcp_retrans_packet(struct tcp_sock * tsk,char *packet, int len,u32 seq,int 
 
 	u32 ack = tsk->rcv_nxt;
 	u16 rwnd = tsk->rcv_wnd;
+    u8 flags = tcp->flags;
 
-	tcp_init_hdr(tcp, sport, dport, seq, ack, TCP_PSH|TCP_ACK, rwnd);
+	tcp_init_hdr(tcp, sport, dport, seq, ack, flags, rwnd);
 	ip_init_hdr(ip, saddr, daddr, ip_tot_len, IPPROTO_TCP);
 
 	tcp->checksum = tcp_checksum(ip, tcp);
@@ -114,9 +115,12 @@ void tcp_retrans_packet(struct tcp_sock * tsk,char *packet, int len,u32 seq,int 
 
 	//tsk->snd_nxt += tcp_data_len;
 	//tsk->snd_wnd -= tcp_data_len;
-
-	ip_send_packet(packet, len);
-	printf("retrans:  seq:%d,ack:%d,count:%d.\n",seq,ack,retrans_count);
+    char * _packet = (char *)malloc(len);
+    memcpy(_packet,packet,len);
+	ip_send_packet(_packet, len);
+    char cb_flags[32];
+	tcp_copy_flags_to_str(flags, cb_flags);
+	printf("retrans:  seq:%d,ack:%d,count:%d,flags:%s.\n",seq,ack,retrans_count,cb_flags);
 	//tsk->retrans_timer.timeout = min(64*1000*1000,tsk->RTO*(2<<retrans_count) );// set the retramsfer
 
 

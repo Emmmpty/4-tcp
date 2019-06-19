@@ -112,9 +112,9 @@ struct tcp_sock {
 	u32 ssthresh;
 
 	// RTO, Retransmis Timeout
-    u32 RTO;
+    int RTO;
     //Estimated RTT
-    u32 eRTT;
+    int eRTT;
 };
 
 void tcp_set_state(struct tcp_sock *tsk, int state);
