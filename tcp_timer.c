@@ -34,6 +34,7 @@ void tcp_scan_timer_list()
                 if (!tsk->parent)
                     tcp_bind_unhash(tsk);
                 tcp_set_state(tsk, TCP_CLOSED);
+                printf("timewait timeer.\n");
                 free_tcp_sock(tsk);
 			}
 			if(t->type==1)
@@ -51,10 +52,10 @@ void tcp_scan_timer_list()
                     t->timeout = tsk->RTO * min(2<< (item->retrans_count),128);
                     t->enable = 1;
                 }
-                else
-                {
-                    tcp_unset_retrans_timer(tsk);
-                }
+                //else
+                //{
+                 //   tcp_unset_retrans_timer(tsk);
+                //}
 			}
 
 		}
@@ -79,13 +80,14 @@ void tcp_set_timewait_timer(struct tcp_sock *tsk)
 void tcp_set_retrans_timer(struct tcp_sock *tsk)
 {
 	//fprintf(stdout, "TODO: implement %s please.\n", __FUNCTION__);
+	static char setflag = 0;
+
     struct tcp_timer *retrans_timer = &tsk->retrans_timer;
     retrans_timer->type = 1;
     retrans_timer->enable =1;
     retrans_timer->timeout = TCP_RETRANS_INTERVAL_INITIAL;
 
     list_add_tail(&retrans_timer->list,&timer_list);
-
     tcp_sock_inc_ref_cnt(tsk);
 }
 
@@ -99,7 +101,8 @@ void tcp_unset_retrans_timer(struct tcp_sock *tsk)
     retrans_timer->enable = 0;
 
     list_delete_entry(&retrans_timer->list);
-    tsk->ref_cnt -=1;
+    tcp_sock_dec_ref_cnt(tsk);
+
 }
 
 // scan the timer_list periodically by calling tcp_scan_timer_list

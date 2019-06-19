@@ -89,7 +89,7 @@ struct tcp_sock *alloc_tcp_sock()
 // decreased to zero.
 void free_tcp_sock(struct tcp_sock *tsk)
 {
-	tsk->ref_cnt -= 1;
+	tcp_sock_dec_ref_cnt(tsk);
 	if (tsk->ref_cnt <= 0) {
 		log(DEBUG, "free tcp sock: ["IP_FMT":%hu<->"IP_FMT":%hu].", \
 				HOST_IP_FMT_STR(tsk->sk_sip), tsk->sk_sport,

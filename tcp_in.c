@@ -119,7 +119,7 @@ void tcp_state_syn_recv(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 static inline int is_tcp_seq_valid(struct tcp_sock *tsk, struct tcp_cb *cb)
 {
 	u32 rcv_end = tsk->rcv_nxt + max(tsk->rcv_wnd, 1);
-	if (less_than_32b(cb->seq, rcv_end) && less_or_equal_32b(tsk->rcv_nxt, cb->seq_end)) {
+	if (less_than_32b(cb->seq, rcv_end) && less_or_equal_32b(tsk->rcv_nxt, cb->seq)) {
 		return 1;
 	}
 	else {
@@ -173,7 +173,9 @@ void tcp_ack_data(struct tcp_sock * tsk,struct tcp_cb * cb)
         }
         else
         {
-            tcp_unset_retrans_timer(tsk);//unset retransfer timer.
+            //if(tsk->retrans_timer.)
+            tcp_unset_retrans_timer(tsk);
+            //tcp_unset_retrans_timer(tsk);//unset retransfer timer.
         }
     }
 }
@@ -373,6 +375,7 @@ void tcp_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
                     //add to the tail
                     {
                         insert_pos = &item->list;
+                        printf("insert tail\n");
                         break;
                     }
                     else
@@ -383,6 +386,13 @@ void tcp_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
             }
             if(insert_pos != NULL)
             {
+
+                printf("\t\t\t##[ofo] buf:[%d,%d),len:%d ###\n",new_item->seq,new_item->seq_end,new_item->len);
+                printf("\t\t\t insert into ofo buffer\n");
+                struct tcp_payload_cache * before,*after ;
+                before = list_entry(insert_pos,struct tcp_payload_cache,list);
+                after = list_entry(insert_pos->next,struct tcp_payload_cache,list);
+                printf("\t\t\t[%d,%d),#[%d,%d)#,[%d,%d)\n",before->seq,before->seq_end,new_item->seq,new_item->seq_end,after->seq,after->seq_end);
                 list_insert(&new_item->list,insert_pos,insert_pos->next);
             }
             else
@@ -395,7 +405,9 @@ void tcp_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
         //it's empty
         {
             list_add_tail(&new_item->list,&tsk->rcv_ofo_buf);
+            printf("\t\t\t ##[ofo add to empty] buf:[%d,%d),len:%d ###\n",new_item->seq,new_item->seq_end,new_item->len);
         }
+
         seq_end = tsk->rcv_nxt;
         char new_data_recv =0;
         if(!list_empty(&tsk->rcv_ofo_buf))
@@ -408,14 +420,18 @@ void tcp_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
                         seq_end = item->seq_end;
                         tsk->rcv_nxt = seq_end;// update recv info.
                         list_delete_entry(&item->list);
+                        printf("recv buf:[%d,%d),len:%d\n",item->seq,item->seq_end,item->len);
                         write_ring_buffer(tsk->rcv_buf, item->payload,item->len);
                         tsk->rcv_wnd -=item->len;
-                        //wake_up(tsk->wait_recv);
+                        wake_up(tsk->wait_recv);
                         //free(item);
                     }
-                    else{
+                    else
+                    {
+                        printf("\t\t\t\t[ofo]:%d->%d\n",seq_end,item->seq);
                         break;
                     }
+
                 }
         }
 

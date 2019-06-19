@@ -10,7 +10,7 @@
 #include "synch_wait.h"
 
 #include <pthread.h>
-
+#include <stdio.h>
 #define PORT_MIN	12345
 #define PORT_MAX	23456
 
@@ -121,9 +121,16 @@ void tcp_set_state(struct tcp_sock *tsk, int state);
 
 static inline void tcp_sock_inc_ref_cnt(struct tcp_sock *tsk)
 {
+
 	tsk->ref_cnt += 1;
+	//printf("[inc_ref :%d]\n",tsk->ref_cnt);
 }
 
+static inline void tcp_sock_dec_ref_cnt(struct tcp_sock *tsk)
+{
+	tsk->ref_cnt -= 1;
+	//printf("[dec_ref :%d]\n",tsk->ref_cnt);
+}
 int tcp_sock_accept_queue_full(struct tcp_sock *tsk);
 void tcp_sock_accept_enqueue(struct tcp_sock *tsk);
 struct tcp_sock *tcp_sock_accept_dequeue(struct tcp_sock *tsk);

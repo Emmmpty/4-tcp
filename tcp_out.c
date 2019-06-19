@@ -79,10 +79,10 @@ void tcp_send_packet(struct tcp_sock *tsk, char *packet, int len)
     //need check!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     tsk->snd_nxt += tcp_data_len;
 	//tsk->snd_wnd -= tcp_data_len;
-	ip_send_packet(packet, len);
+
 
     tcp_add_send_buf(tsk,packet,len,seq,tsk->snd_nxt);
-
+    ip_send_packet(packet, len);
 
 
 }
