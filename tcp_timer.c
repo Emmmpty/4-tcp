@@ -46,11 +46,10 @@ void tcp_scan_timer_list()
                 if(!list_empty(&tsk->send_buf))
                 {
                  //printf("retrans....\n");
-                    struct tcp_packet_cache * item= list_entry(tsk->send_buf.next,struct tcp_packet_cache, list);
-                    tcp_retrans_packet(tsk,item->data,item->len,item->seq,item->retrans_count+1);
-                    item->retrans_count +=1;
-                    t->timeout = tsk->RTO * min(2<< (item->retrans_count),128);
-                    t->enable = 1;
+                    tcp_retrans(tsk);
+
+                    tsk->ssthresh = MSS*2 > (tsk->cwnd * MSS /2.0)? MSS*2 : (tsk->cwnd * MSS /2.0);
+                    tsk->cwnd = 1;
                 }
                 //else
                 //{
@@ -85,8 +84,16 @@ void tcp_set_retrans_timer(struct tcp_sock *tsk)
     struct tcp_timer *retrans_timer = &tsk->retrans_timer;
     retrans_timer->type = 1;
     retrans_timer->enable =1;
-    retrans_timer->timeout = TCP_RETRANS_INTERVAL_INITIAL;
-
+    if (setflag!=0)
+    {
+        retrans_timer->timeout = TCP_RETRANS_INTERVAL_INITIAL;
+    }
+    else
+    // first syn, the timeout should be very large.
+    {
+        retrans_timer->timeout = 5 * TCP_MSL;
+        setflag = 1;
+    }
     list_add_tail(&retrans_timer->list,&timer_list);
     tcp_sock_inc_ref_cnt(tsk);
 }

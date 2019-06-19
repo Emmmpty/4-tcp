@@ -2,6 +2,7 @@
 
 #include "log.h"
 
+#include <sys/time.h>
 #include <unistd.h>
 
 #define BUF_SIZE 1000
@@ -33,6 +34,7 @@ void *tcp_server(void *arg)
 
 	char rbuf[BUF_SIZE];
 	FILE *file = fopen("server-output.dat", "wb");
+	//FILE *file_congest = fopen("server-congest-log.dat","wb");
 	int total_cnt = 0;
 	while (1) {
 		int rlen = tcp_sock_read(csk, rbuf, BUF_SIZE);
@@ -43,10 +45,12 @@ void *tcp_server(void *arg)
 		else if (rlen > 0) {
 			fwrite(rbuf, 1, rlen, file);
 			printf("receive %d bytes.\n",rlen);
+			printf("time:%d,cwnd:%d,ssthresh:%d,seq:%d\n",(int)time(0),(int)csk->cwnd * MSS,(int)csk->ssthresh,csk->snd_nxt);
+			//fprintf(file_congest,"%d,%d,%d,%d\n",(int)time(0),(int)csk->cwnd * MSS,(int)csk->ssthresh,csk->snd_nxt);
 			total_cnt += rlen;
 		}
 	}
-
+	//fclose(file_congest);
 	fclose(file);
 	printf("recieve %d bytes\n",total_cnt);
 	log(DEBUG, "close this connection.");
@@ -73,16 +77,22 @@ void *tcp_client(void *arg)
 	char buf[BUF_SIZE];
 	sleep(5);
 	FILE *file = fopen("client-input.dat", "rb");
+	FILE *file_congest = fopen("client-congest-log.dat","wb");
 	int total_cnt = 0;
+	struct timezone tz;
+	struct timeval tv;
 	while (!feof(file)) {
         int ret_size = fread(buf, 1, BUF_SIZE, file);
         tcp_sock_write(tsk, buf, ret_size);
         printf("send %d bytes.\n",ret_size);
+        gettimeofday(&tv,&tz);
+        printf("time:%f,cwnd:%f,ssthresh:%f,seq:%d\n",tv.tv_sec+ tv.tv_usec/1000000.0,tsk->cwnd,tsk->ssthresh/MSS,tsk->snd_nxt);
+        fprintf(file_congest,"%f,%f,%f,%d\n",tv.tv_sec+ tv.tv_usec/1000000.0,tsk->cwnd,tsk->ssthresh/MSS,tsk->snd_nxt);
         total_cnt +=ret_size;
         if (ret_size < BUF_SIZE) break;
         //usleep(1000*20);
     }
-
+    fclose(file_congest);
     fclose(file);
     printf("total send %d bytes\n",total_cnt);
     printf("client: close tsk.\n");

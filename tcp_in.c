@@ -29,7 +29,7 @@ void tcp_state_listen(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 	c_tsk->rcv_nxt = cb->seq_end;
 
 	c_tsk->parent = tsk;
-	c_tsk->snd_wnd = cb->rwnd;
+	c_tsk->snd_wnd = min(c_tsk->cwnd * MSS, cb->rwnd);
 
 
 	list_add_tail(&c_tsk->list, &tsk->listen_queue);
@@ -64,7 +64,7 @@ void tcp_state_syn_sent(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 		return;
 	}
 	tsk->rcv_nxt = cb->seq_end;
-	tsk->snd_wnd = cb->rwnd;
+	tsk->snd_wnd = min(cb->rwnd,tsk->cwnd * MSS);
     tsk->snd_una = cb->ack;
 	tcp_send_control_packet(tsk, TCP_ACK);
 	tcp_set_state(tsk, TCP_ESTABLISHED);
@@ -77,8 +77,8 @@ void tcp_state_syn_sent(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 static inline void tcp_update_window(struct tcp_sock *tsk, struct tcp_cb *cb)
 {
 	u16 old_snd_wnd = tsk->snd_wnd;
-	tsk->snd_wnd = min(cb->rwnd,4000);
-	printf("update snd_wnd:%d->%d\n",old_snd_wnd,cb->rwnd);
+	tsk->snd_wnd = min(cb->rwnd,tsk->cwnd * MSS);
+	printf("update snd_wnd:%d->%d\n",old_snd_wnd,tsk->snd_wnd);
 	if (old_snd_wnd == 0)
 		wake_up(tsk->wait_send);
 }
@@ -103,7 +103,7 @@ void tcp_state_syn_recv(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 	tcp_sock_accept_enqueue(tsk);
 
     tsk->rcv_nxt = cb->seq_end;
-	tsk->snd_wnd = cb->rwnd;
+	tsk->snd_wnd = min(cb->rwnd,tsk->cwnd * MSS);
     //tsk->snd_una = cb->ack;
 
 	tcp_set_state(tsk, TCP_ESTABLISHED);
@@ -151,9 +151,29 @@ void tcp_ack_data(struct tcp_sock * tsk,struct tcp_cb * cb)
             // acked
             {
                 if(packet_cache_item->seq_end > tsk->snd_una)
+                //acked new data
                 {
                     tsk->snd_una = packet_cache_item->seq_end;
                     new_acked = 1;
+                    if(tsk->dupack > 3)
+                    {
+                        tsk->cwnd = tsk->ssthresh / MSS ;
+                    }
+                    else
+                    {
+                        //ack new data,and add congest window
+                        if (tsk->cwnd * MSS <= tsk->ssthresh)
+                            // slow boot,multi increment
+                        {
+                            tsk->cwnd += 1;
+                        }
+                        else
+                            // avoid congest,addtional increment
+                        {
+                            tsk->cwnd +=1.0/tsk->cwnd;
+                        }
+                    }
+                    tsk->dupack = 1;
                 }
 
                 list_delete_entry(&packet_cache_item->list);
@@ -165,6 +185,22 @@ void tcp_ack_data(struct tcp_sock * tsk,struct tcp_cb * cb)
         if(new_acked)
         {
             wake_up(tsk->wait_send);
+        }
+        else
+        {
+            tsk->dupack +=1;
+            if(tsk->dupack==3)
+            // fast recovery, fast retransmiss
+            {
+                tsk->ssthresh = max(MSS*2,tsk->cwnd * MSS / 2.0);
+                //tsk->cwnd = tsk->ssthresh/MSS  + 3;
+                tsk->cwnd =1;
+                tcp_retrans(tsk);
+            }
+            if(tsk->dupack>3)
+            {
+                tsk->cwnd +=1;
+            }
         }
         if(!list_empty(&tsk->send_buf))
         {
@@ -229,7 +265,7 @@ void tcp_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 		tcp_ack_data(tsk,cb);
 		return;
 	}
-
+    /*
     if (cb->flags & TCP_RST)
 	{
 		//close this connection, and release the resources of this tcp sock
@@ -246,7 +282,7 @@ void tcp_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 		tcp_unhash(tsk);
 		return;
 	}
-
+    */
     if (!(cb->flags & TCP_ACK))
 	{
 		//drop
@@ -319,6 +355,7 @@ void tcp_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 		tcp_send_control_packet(tsk, TCP_ACK);
 		return;
 	}
+
     tcp_ack_data(tsk,cb);
 
     if (cb->ack < tsk->snd_una)

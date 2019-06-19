@@ -53,6 +53,10 @@ struct tcp_sock *alloc_tcp_sock()
 	tsk->state = TCP_CLOSED;
 	tsk->rcv_wnd = TCP_DEFAULT_WINDOW;
 
+    //init congestion info.
+    tsk->ssthresh = TCP_DEFAULT_WINDOW ;
+    tsk->cwnd = 1;
+    tsk->dupack = 1;
 	//init state
     tsk->iss =  0;
     tsk->snd_una = 0;

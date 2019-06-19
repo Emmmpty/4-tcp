@@ -87,6 +87,19 @@ void tcp_send_packet(struct tcp_sock *tsk, char *packet, int len)
 
 }
 
+
+// retransmiss the first send-buffer packet of tcp_sock
+void tcp_retrans(struct tcp_sock * tsk)
+{
+    if(!list_empty(&tsk->send_buf))
+    {
+        struct tcp_packet_cache * item= list_entry(tsk->send_buf.next,struct tcp_packet_cache, list);
+        tcp_retrans_packet(tsk,item->data,item->len,item->seq,item->retrans_count+1);
+        item->retrans_count +=1;
+        tsk->retrans_timer.timeout = tsk->RTO * min(2<< (item->retrans_count),128);
+        tsk->retrans_timer.enable = 1;
+    }
+}
 //retransmiss a packet.
 
 void tcp_retrans_packet(struct tcp_sock * tsk,char *packet, int len,u32 seq,int retrans_count)
